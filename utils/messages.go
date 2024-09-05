@@ -1,7 +1,7 @@
 package TCP_Chat
 
 import (
-	"errors"
+	"bufio"
 	"net"
 	"sync"
 )
@@ -9,7 +9,7 @@ import (
 func (s *Server) GlobalMessage(Conn net.Conn, msg []byte) {
 	for _, c := range s.Conns {
 		println(c.RemoteAddr().String(), Conn.LocalAddr().String())
-		if c.RemoteAddr().String() != Conn.RemoteAddr().String() && Users[Conn.RemoteAddr().String()] != "" {
+		if c.RemoteAddr().String() != Conn.RemoteAddr().String() && len(Users[Conn.RemoteAddr().String()]) != 0 {
 			c.Write(msg)
 			c.Write([]byte(Format(Users[c.RemoteAddr().String()], "")))
 		}
@@ -26,6 +26,14 @@ func (s *Server) GetMessage(Conn net.Conn, mutex *sync.Mutex) {
 		Conn.Write([]byte("Invalid Name!"))
 		Conn.Close()
 		return
+	} else {
+		for _, CurName := range Users {
+			if string(Name[:index-1]) == CurName {
+				Conn.Write([]byte("Username already Exist!"))
+				Conn.Close()
+				return
+			}
+		}
 	}
 	Bytes := make([]byte, 1024)
 	if len(s.Messages) > 0 {
@@ -33,17 +41,16 @@ func (s *Server) GetMessage(Conn net.Conn, mutex *sync.Mutex) {
 			Conn.Write([]byte(msg))
 		}
 	}
-	s.GlobalMessage(Conn, []byte("\n"+Users[Conn.RemoteAddr().String()]+" Joined\n"))
 	mutex.Lock()
 	Users[Conn.RemoteAddr().String()] = string(Name[:index-1])
 	mutex.Unlock()
+	s.GlobalMessage(Conn, []byte("\n"+Users[Conn.RemoteAddr().String()]+" Joined\n"))
 	for {
 		Conn.Write([]byte(Format(Users[Conn.RemoteAddr().String()], "")))
 		index, err := Conn.Read(Bytes)
 		if err != nil {
-			if errors.Is(err, net.ErrClosed) {
-				s.GlobalMessage(Conn, []byte(Users[Conn.RemoteAddr().String()]+" Disconnected!"))
-				return
+			if !bufio.NewScanner(Conn).Scan() {
+				break
 			}
 			continue
 		}
@@ -53,4 +60,5 @@ func (s *Server) GetMessage(Conn net.Conn, mutex *sync.Mutex) {
 		s.GlobalMessage(Conn, []byte("\n"+Format(Users[Conn.RemoteAddr().String()], string(Bytes[:index]))))
 		Bytes = make([]byte, 1024)
 	}
+	s.GlobalMessage(Conn, []byte("\n"+Users[Conn.RemoteAddr().String()]+" Disconnected!"+"\n"))
 }

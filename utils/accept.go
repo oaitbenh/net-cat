@@ -16,7 +16,6 @@ func (s *Server) AcceptLoop() {
 		}
 		s.Conns = append(s.Conns, conn)
 		var mutex sync.Mutex
-		fmt.Println(conn.RemoteAddr().String())
 		go s.GetMessage(conn, &mutex)
 	}
 }
