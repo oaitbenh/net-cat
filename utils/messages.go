@@ -8,8 +8,7 @@ import (
 
 func (s *Server) GlobalMessage(Conn net.Conn, msg []byte) {
 	for _, c := range s.Conns {
-		println(c.RemoteAddr().String(), Conn.LocalAddr().String())
-		if c.RemoteAddr().String() != Conn.RemoteAddr().String() && len(Users[Conn.RemoteAddr().String()]) != 0 {
+		if c.RemoteAddr().String() != Conn.RemoteAddr().String() && len(Users[c.RemoteAddr().String()]) != 0 {
 			c.Write(msg)
 			c.Write([]byte(Format(Users[c.RemoteAddr().String()], "")))
 		}
@@ -18,8 +17,7 @@ func (s *Server) GlobalMessage(Conn net.Conn, msg []byte) {
 
 func (s *Server) GetMessage(Conn net.Conn, mutex *sync.Mutex) {
 	defer Conn.Close()
-	Conn.Write([]byte("<< Useranme Condition Min Len 4 char Max len 20 >>\n"))
-	Conn.Write([]byte("Print Your Username : "))
+	Conn.Write([]byte("Welcome to TCP-Chat!\n[ENTER YOUR NAME]:"))
 	Name := make([]byte, 20)
 	index, err := Conn.Read(Name)
 	if err != nil || index < 4 || index > 20 {
@@ -43,6 +41,7 @@ func (s *Server) GetMessage(Conn net.Conn, mutex *sync.Mutex) {
 	}
 	mutex.Lock()
 	Users[Conn.RemoteAddr().String()] = string(Name[:index-1])
+	s.Messages = append(s.Messages, Users[Conn.RemoteAddr().String()]+" Joined\n")
 	mutex.Unlock()
 	s.GlobalMessage(Conn, []byte("\n"+Users[Conn.RemoteAddr().String()]+" Joined\n"))
 	for {
@@ -61,4 +60,8 @@ func (s *Server) GetMessage(Conn net.Conn, mutex *sync.Mutex) {
 		Bytes = make([]byte, 1024)
 	}
 	s.GlobalMessage(Conn, []byte("\n"+Users[Conn.RemoteAddr().String()]+" Disconnected!"+"\n"))
+	mutex.Lock()
+	s.Messages = append(s.Messages, Users[Conn.RemoteAddr().String()]+" Disconnected!"+"\n")
+	mutex.Unlock()
+	Users[Conn.RemoteAddr().String()] = ""
 }
